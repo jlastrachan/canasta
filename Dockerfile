@@ -29,7 +29,5 @@ RUN cp /build/main .
 # Export necessary port
 EXPOSE 8080
 
-RUN go get github.com/githubnemo/CompileDaemon
-
 # Command to run when starting the container
-ENTRYPOINT CompileDaemon --build="go build main.go" --command=./runserver
+CMD [ "./main" ]
