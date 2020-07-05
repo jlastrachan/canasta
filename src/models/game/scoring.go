@@ -1,6 +1,6 @@
 package game
 
-import "github.com/jlastrachan/canasta/models/deck"
+import "github.com/jlastrachan/canasta/src/models/deck"
 
 var scores = map[deck.CardRank]int{
 	deck.Four:  5,

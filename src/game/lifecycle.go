@@ -2,9 +2,9 @@ package game
 
 import (
 	"github.com/google/uuid"
-	"github.com/jlastrachan/canasta/models/deck"
-	game_model "github.com/jlastrachan/canasta/models/game"
-	"github.com/jlastrachan/canasta/models/user"
+	"github.com/jlastrachan/canasta/src/models/deck"
+	game_model "github.com/jlastrachan/canasta/src/models/game"
+	"github.com/jlastrachan/canasta/src/models/user"
 )
 
 func StartGame(gameModel *game_model.Game, userModel *user.UserModel) {

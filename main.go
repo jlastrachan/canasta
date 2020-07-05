@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/jlastrachan/canasta/router"
+	"github.com/jlastrachan/canasta/src/router"
 	"log"
 	"net/http"
 	"os"

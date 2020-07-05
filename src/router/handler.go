@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"github.com/alecthomas/template"
 	"github.com/google/uuid"
-	"github.com/jlastrachan/canasta/game"
-	"github.com/jlastrachan/canasta/models/deck"
-	game_model "github.com/jlastrachan/canasta/models/game"
-	"github.com/jlastrachan/canasta/models/user"
-	"github.com/jlastrachan/canasta/webpack"
+	"github.com/jlastrachan/canasta/src/game"
+	"github.com/jlastrachan/canasta/src/models/deck"
+	game_model "github.com/jlastrachan/canasta/src/models/game"
+	"github.com/jlastrachan/canasta/src/models/user"
+	"github.com/jlastrachan/canasta/src/webpack"
 	"io/ioutil"
 	"net/http"
 	"path"
@@ -41,7 +41,7 @@ func (h *Handler) GetIndexHandler(buildPath string) http.HandlerFunc {
 		fmt.Println(file.Name())
 	}
 
-	tmpl, err := template.ParseFiles(path.Join("templates", "index.html"))
+	tmpl, err := template.ParseFiles(path.Join("src", "templates", "index.html"))
 
 	if err != nil {
 		return func(res http.ResponseWriter, req *http.Request) {

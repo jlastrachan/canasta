@@ -3,8 +3,8 @@ package game
 import (
 	"errors"
 	"github.com/google/uuid"
-	"github.com/jlastrachan/canasta/models/deck"
-	"github.com/jlastrachan/canasta/models/user"
+	"github.com/jlastrachan/canasta/src/models/deck"
+	"github.com/jlastrachan/canasta/src/models/user"
 )
 
 type GameStatus string

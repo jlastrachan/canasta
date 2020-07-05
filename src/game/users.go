@@ -1,7 +1,7 @@
 package game
 
 import (
-	"github.com/jlastrachan/canasta/models/user"
+	"github.com/jlastrachan/canasta/src/models/user"
 )
 
 func AddUser(userModel *user.UserModel, name string) (*user.User, error) {
