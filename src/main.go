@@ -5,6 +5,7 @@ import (
 	"github.com/jlastrachan/canasta/router"
 	"log"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -19,8 +20,13 @@ func main() {
 	// log.Printf("Postgres started at %s PORT", config.PORT)
 	// defer db.Close()
 
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
 	s := &http.Server{
-		Addr:           ":8080",
+		Addr:           ":" + port,
 		Handler:        router.Serve(),
 		ReadTimeout:    10 * time.Second,
 		WriteTimeout:   10 * time.Second,
