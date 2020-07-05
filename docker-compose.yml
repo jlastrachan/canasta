@@ -16,8 +16,8 @@ services:
     ports:
       - '8080:8080'
     volumes:
-      - ./:/dist
-    working_dir: /dist
+      - ./:/app
+    working_dir: /app
       
     # image: golang:1.14.2-alpine
     # volumes:
