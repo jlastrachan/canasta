@@ -10,7 +10,7 @@ func Serve() *http.ServeMux {
 	mux := http.NewServeMux()
 	h := NewHandler()
 
-	buildPath := path.Clean("src/client/build")
+	buildPath := path.Clean("web")
 	staticPath := path.Join(buildPath, "/static/")
 
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir(staticPath))))

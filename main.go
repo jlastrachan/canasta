@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-const port = "8080"
+// const port = "8080"
 
 func main() {
 	fmt.Println("Hello World")
@@ -24,6 +24,7 @@ func main() {
 	if port == "" {
 		port = "8080"
 	}
+	fmt.Printf("using port %s", port)
 
 	s := &http.Server{
 		Addr:           ":" + port,
