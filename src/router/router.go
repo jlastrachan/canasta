@@ -16,7 +16,7 @@ func Serve() *http.ServeMux {
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir(staticPath))))
 	mux.HandleFunc("/add_user", h.AddUser)
 	mux.HandleFunc("/list_users", h.ListUsers)
-	mux.HandleFunc("/start_game", h.StartGame)
+	mux.HandleFunc("/start_game", h.StartMatch)
 	mux.HandleFunc("/get_hand", h.GetHand)
 	mux.HandleFunc("/game_state", h.GameState)
 	mux.HandleFunc("/restart_game", h.RestartGame)

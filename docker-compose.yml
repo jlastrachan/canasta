@@ -14,10 +14,10 @@ services:
 
     build: .
     ports:
-      - '8080:8080'
+      - '3000:8080'
     # volumes:
     #   - ./:/app
-    working_dir: /
+    # working_dir: /app
       
     # image: golang:1.14.2-alpine
     # volumes:
@@ -32,3 +32,12 @@ services:
   #   restart: always
   #   environment: 
   #     POSTGRES_PASSWORD: example
+  # dev_app:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile-dev
+  #   ports:
+  #     - '8080:8080'
+  #   volumes:
+  #     - ./src:/app
+  #   working_dir: /app

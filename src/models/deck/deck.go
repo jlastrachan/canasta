@@ -40,7 +40,8 @@ const (
 var suitedCardRanks = []CardRank{Ace, Two, Three, Four, Five, Six, Seven, Eight, Nine, Ten, Jack, Queen, King}
 
 type Deck struct {
-	Cards []*Card `json:"cards"`
+	FreshCards  []*Card `json:"cards"`
+	DiscardPile []*Card
 }
 
 type Card struct {
@@ -51,14 +52,15 @@ type Card struct {
 
 func GetDeck(numDecks int) *Deck {
 	deck := &Deck{
-		Cards: []*Card{},
+		FreshCards:  []*Card{},
+		DiscardPile: []*Card{},
 	}
 
 	for d := 0; d < numDecks; d++ {
 
 		for _, rank := range suitedCardRanks {
 			for _, suit := range allSuites {
-				deck.Cards = append(deck.Cards, &Card{
+				deck.FreshCards = append(deck.FreshCards, &Card{
 					ID:   uuid.New(),
 					Suit: suit,
 					Rank: rank,
@@ -66,13 +68,13 @@ func GetDeck(numDecks int) *Deck {
 			}
 		}
 
-		deck.Cards = append(deck.Cards, &Card{
+		deck.FreshCards = append(deck.FreshCards, &Card{
 			ID:   uuid.New(),
 			Suit: Clubs,
 			Rank: Joker,
 		})
 
-		deck.Cards = append(deck.Cards, &Card{
+		deck.FreshCards = append(deck.FreshCards, &Card{
 			ID:   uuid.New(),
 			Suit: Hearts,
 			Rank: Joker,
@@ -85,17 +87,48 @@ func GetDeck(numDecks int) *Deck {
 
 func (d *Deck) Shuffle() {
 	rand.Seed(time.Now().UnixNano())
-	rand.Shuffle(len(d.Cards), func(i, j int) { d.Cards[i], d.Cards[j] = d.Cards[j], d.Cards[i] })
+	rand.Shuffle(len(d.FreshCards), func(i, j int) { d.FreshCards[i], d.FreshCards[j] = d.FreshCards[j], d.FreshCards[i] })
 }
 
 func (d *Deck) PopCard() *Card {
 	var card *Card
-	card, d.Cards = d.Cards[0], d.Cards[1:]
+	card, d.FreshCards = d.FreshCards[0], d.FreshCards[1:]
 	return card
 }
 
+func (d *Deck) Discard(c *Card) {
+	d.DiscardPile = append([]*Card{c}, d.DiscardPile...)
+}
+
+func (d *Deck) PopDiscardPile() []*Card {
+	discard := d.DiscardPile
+	d.DiscardPile = []*Card{}
+	return discard
+}
+
+func (d *Deck) GetDiscard() []*Card {
+	return d.DiscardPile
+}
+
+func (d *Deck) IsDiscardFrozen() bool {
+	for _, c := range d.DiscardPile {
+		if c.IsWildCard() {
+			return true
+		}
+	}
+	return false
+}
+
+//
+// Card helpers
+//
+
 func (c *Card) IsBlackThree() bool {
 	return c.Rank == Three && (c.Suit == Clubs || c.Suit == Spades)
+}
+
+func (c *Card) IsRedThree() bool {
+	return c.Rank == Three && (c.Suit == Hearts || c.Suit == Diamonds)
 }
 
 func (c *Card) IsWildCard() bool {

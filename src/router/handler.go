@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jlastrachan/canasta/src/game"
 	"github.com/jlastrachan/canasta/src/models/deck"
-	game_model "github.com/jlastrachan/canasta/src/models/game"
+	"github.com/jlastrachan/canasta/src/models/match"
 	"github.com/jlastrachan/canasta/src/models/user"
 	"github.com/jlastrachan/canasta/src/webpack"
 	"io/ioutil"
@@ -17,18 +17,14 @@ import (
 
 type Handler struct {
 	userModel *user.UserModel
-	game      *game_model.Game
+	match     *match.Match
 }
 
 func NewHandler() *Handler {
 	return &Handler{
 		userModel: user.New(),
-		game:      game_model.Init(),
+		match:     match.Init(),
 	}
-}
-
-type AddUserRequest struct {
-	Name string
 }
 
 func (h *Handler) GetIndexHandler(buildPath string) http.HandlerFunc {
@@ -62,6 +58,10 @@ func (h *Handler) GetIndexHandler(buildPath string) http.HandlerFunc {
 			http.Error(res, err.Error(), http.StatusInternalServerError)
 		}
 	}
+}
+
+type AddUserRequest struct {
+	Name string
 }
 
 func (h *Handler) AddUser(w http.ResponseWriter, r *http.Request) {
@@ -105,13 +105,13 @@ func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(users)
 }
 
-func (h *Handler) StartGame(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) StartMatch(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
 		http.NotFound(w, r)
 		return
 	}
 
-	game.StartGame(h.game, h.userModel)
+	game.StartGame(h.match, h.userModel)
 	okStatus(w)
 }
 
@@ -138,7 +138,7 @@ func (h *Handler) GetHand(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ret := game.GetHand(h.game, req.UserID)
+	ret := game.GetHand(h.match.CurrentGame, req.UserID)
 	okStatus(w)
 	json.NewEncoder(w).Encode(ret)
 }
@@ -171,7 +171,12 @@ func (h *Handler) GameState(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ret := game.GetGameState(h.game, userID)
+	ret, err := game.GetGameState(h.match.CurrentGame, userID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	okStatus(w)
 	json.NewEncoder(w).Encode(ret)
 }
@@ -182,7 +187,7 @@ func (h *Handler) RestartGame(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.game = game_model.Init()
+	h.match = match.Init()
 	h.userModel = user.New()
 	okStatus(w)
 }
@@ -206,14 +211,18 @@ func (h *Handler) PickCard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.game.PickCard(req.UserID)
+	err = game.PickCard(h.match.CurrentGame, req.UserID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
+	ret, err := game.GetGameState(h.match.CurrentGame, req.UserID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 	okStatus(w)
-	ret := game.GetGameState(h.game, req.UserID)
 	json.NewEncoder(w).Encode(ret)
 }
 
@@ -236,14 +245,19 @@ func (h *Handler) PickPile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.game.PickPile(req.UserID)
+	err = game.PickPile(h.match.CurrentGame, req.UserID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	ret, err := game.GetGameState(h.match.CurrentGame, req.UserID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	okStatus(w)
-	ret := game.GetGameState(h.game, req.UserID)
 	json.NewEncoder(w).Encode(ret)
 }
 
@@ -272,14 +286,19 @@ func (h *Handler) Meld(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.game.Meld(req.UserID, req.MeldRank, req.CardIDs)
+	err = game.Meld(h.match.CurrentGame, req.UserID, req.MeldRank, req.CardIDs)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	ret, err := game.GetGameState(h.match.CurrentGame, req.UserID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	okStatus(w)
-	ret := game.GetGameState(h.game, req.UserID)
 	json.NewEncoder(w).Encode(ret)
 }
 
@@ -307,14 +326,19 @@ func (h *Handler) Discard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.game.Discard(req.UserID, req.CardID)
+	err = game.Discard(h.match.CurrentGame, req.UserID, req.CardID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	ret, err := game.GetGameState(h.match.CurrentGame, req.UserID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	okStatus(w)
-	ret := game.GetGameState(h.game, req.UserID)
 	json.NewEncoder(w).Encode(ret)
 }
 

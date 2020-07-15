@@ -54,7 +54,18 @@ export default class GameView extends React.Component {
     };
     fetch('/add_user', requestOptions)
         .then(response => response.json())
-        .then(data => this.setState({ userID: data.id }));
+        .then(data => this.setState({ userID: data.id }))
+        .then(this.pollForGameStart());
+  }
+
+  pollForGameStart = () => {
+    this.getGameState(); 
+
+    if (!this.state.gameState) {
+      setTimeout(() => {
+        this.pollForGameStart();
+      }, 1000)
+    }
   }
 
   onTextChange = (e) => {
@@ -67,6 +78,7 @@ export default class GameView extends React.Component {
     };
     fetch('/game_state?user_id=' + this.state.userID, requestOptions)
         .then(response => response.json())
+        .catch(() => undefined)
         .then(data => this.setState({ gameState: data }));
   }
 
@@ -146,14 +158,13 @@ export default class GameView extends React.Component {
       return;
     }
     var canMeld = true;
-    this.state.selectedCards.map(cardId => {
-      this.state.gameState.hand.map(card => {
+    this.state.selectedCards.forEach(cardId => {
+      this.state.gameState.hand.forEach(card => {
         if (card.id === cardId) {
           if (card.rank !== '2' && card.rank !== 'Joker') {
             if (meldRank && meldRank !== card.rank) {
               alert("Must select cards from one rank + wildcards");
               canMeld=false;
-              return;
             } else {
               meldRank = card.rank;
             }
@@ -243,7 +254,7 @@ export default class GameView extends React.Component {
   renderCard(card, size, onClick) {
     function importAll(r) {
       let images = {};
-      r.keys().map((item, index) => { images[item.replace('./', '')] = r(item); });
+      r.keys().forEach((item, index) => { images[item.replace('./', '')] = r(item); });
       return images;
     }
     
@@ -253,7 +264,7 @@ export default class GameView extends React.Component {
     const width = size === 'large' ? "100px" : "50px";
     const height = size === 'large' ? "145px" : "72px";
     
-    const img = <img key={card.id} src={images[imageSrc]} style={{width, height}}></img>;
+    const img = <img alt={imageSrc} key={card.id} src={images[imageSrc]} style={{width, height}}></img>;
 
     var variant = "light";
     if (this.state.selectedCards.includes(card.id)) {
@@ -386,20 +397,55 @@ export default class GameView extends React.Component {
   renderMeld(meld) {
     var melds = [];
     for (const rank in meld) {
-      var cardList = [];
-      meld[rank].forEach(card => {
-        console.log(card);
-        cardList.push(<div style={{display: 'inline-block'}}>{this.renderCard(card, 'small', null)}</div>);
-      })
+      var data = this.countMeld(meld[rank], rank);
       melds.push((
-        <div>{cardList}</div>
+        <li>
+          {data.naturalCount+data.wildCount < 7 ? this.renderNonCanasta(rank, data.naturalCount, data.wildCount) : this.renderCanasta(rank, data.wildCount)}
+        </li>
       ));
     }    
     return (
       <div>
-        {melds}
+        <ul>
+          {melds}
+        </ul>
       </div>
     )
+  }
+
+  countMeld(meldCards, meldRank) {
+    var naturalCount = 0;
+    var wildCount = 0;
+    for (const i in meldCards) {
+      if (meldCards[i].rank === meldRank) {
+        naturalCount++; 
+      } else {
+        wildCount++;
+      }
+    }
+    return {naturalCount, wildCount};
+  }
+
+  renderCanasta(rank, wildCount) {
+    return (
+      <div style={{display: 'inline-block'}}>
+        {this.renderMeldCard(rank, wildCount)}
+        Canasta!
+      </div>
+    );
+  }
+
+  renderNonCanasta(rank, naturalCount, wildCount) {
+    return (
+      <div style={{display: 'inline-block'}}>
+        {this.renderMeldCard(rank, wildCount)}
+        {rank}s: {naturalCount}, wild: {wildCount}
+      </div>
+    );
+  }
+
+  renderMeldCard(rank, wildCount) {
+    return this.renderCard({rank, suit: wildCount > 0 ? 'spades': 'hearts'}, 'small', null);
   }
 
   render() {
