@@ -186,10 +186,13 @@ export default class GameView extends React.Component {
       })
     };
     fetch('/meld', requestOptions)
-    .then(response => response.json())
-    .then(data => {
-      this.setState({ gameState: data, selectedCards: [] });
-    }); 
+    .then(response => {
+      if (response.status !== 200) {
+        response.text().then(t => alert(t));
+      } else {
+        response.json().then(data => this.setState({ gameState: data, selectedCards: [] }));
+      }
+    });
   }
 
   makeOnClickCard = (card) => {
