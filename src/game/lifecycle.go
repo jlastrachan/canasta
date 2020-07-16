@@ -48,12 +48,13 @@ func GetHand(gameModel *game_model.Game, userID uuid.UUID) []*deck.Card {
 
 // GameState TODO
 type GameState struct {
-	Hand         []*deck.Card                                 `json:"hand"`
-	State        game_model.GameStatus                        `json:"status"`
-	Turn         uuid.UUID                                    `json:"turn"`
-	Players      []*GamePlayer                                `json:"players"`
-	TopOfDiscard *deck.Card                                   `json:"top_of_discard"`
-	Melds        map[uuid.UUID]map[deck.CardRank][]*deck.Card `json:"melds"`
+	Hand          []*deck.Card                                 `json:"hand"`
+	State         game_model.GameStatus                        `json:"status"`
+	Turn          uuid.UUID                                    `json:"turn"`
+	Players       []*GamePlayer                                `json:"players"`
+	TopOfDiscard  *deck.Card                                   `json:"top_of_discard"`
+	DiscardLength int                                          `json:"discard_length"`
+	Melds         map[uuid.UUID]map[deck.CardRank][]*deck.Card `json:"melds"`
 }
 
 // GamePlayer TODO
@@ -92,12 +93,13 @@ func GetGameState(gameModel *game_model.Game, userID uuid.UUID) (GameState, erro
 	}
 
 	return GameState{
-		Hand:         gameModel.GetPlayerHand(userID).Hand(),
-		State:        gameModel.State.Status,
-		Turn:         gameModel.Users[gameModel.State.Turn].ID,
-		Players:      gamePlayers,
-		Melds:        melds,
-		TopOfDiscard: topOfDiscard,
+		Hand:          gameModel.GetPlayerHand(userID).Hand(),
+		State:         gameModel.State.Status,
+		Turn:          gameModel.Users[gameModel.State.Turn].ID,
+		Players:       gamePlayers,
+		Melds:         melds,
+		TopOfDiscard:  topOfDiscard,
+		DiscardLength: len(gameModel.Deck.GetDiscard()),
 	}, nil
 }
 

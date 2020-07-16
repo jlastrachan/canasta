@@ -409,6 +409,7 @@ export default class GameView extends React.Component {
       <div>
         <h3>Discard Pile:</h3>
         {this.renderCard(this.state.gameState.top_of_discard, 'large', null)}
+        Discard Length: {this.state.gameState.discard_length}
       </div>
     );
   }
