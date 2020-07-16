@@ -2,6 +2,7 @@ package game
 
 import (
 	"errors"
+	"fmt"
 	"github.com/google/uuid"
 	"github.com/jlastrachan/canasta/src/models/deck"
 	game_model "github.com/jlastrachan/canasta/src/models/game"
@@ -18,6 +19,13 @@ func getNumCardsPerHand(numUsers int) int {
 	default:
 		return 15
 	}
+}
+
+// MeldError custom meld error
+type MeldError struct {
+	error
+	Message string `json:"message"`
+	Code    string `json:"code"`
 }
 
 // StartGame TODO
@@ -106,96 +114,106 @@ func dealCard(g *game_model.Game, userID uuid.UUID) {
 }
 
 // Meld Melds the provided cards with the provided rank for the user
-func Meld(g *game_model.Game, userID uuid.UUID, cardRank deck.CardRank, cardIDs []uuid.UUID) error {
-	err := isValidMeld(g, userID, cardRank, cardIDs)
+func Meld(g *game_model.Game, userID uuid.UUID, melds map[deck.CardRank][]uuid.UUID) error {
+	err := isValidMeld(g, userID, melds)
 	if err != nil {
 		return err
 	}
-	g.Meld(userID, cardRank, cardIDs)
 
+	for cardRank, cardIDs := range melds {
+		g.Meld(userID, cardRank, cardIDs)
+	}
 	return nil
 }
 
 // TODO: could be multiple melds
-func isValidMeld(g *game_model.Game, userID uuid.UUID, cardRank deck.CardRank, cardIDs []uuid.UUID) error {
-	if cardRank == deck.Three && !canUserGoOut(userID) {
-		return errors.New("Can't meld 3s unless going out")
-	}
+func isValidMeld(g *game_model.Game, userID uuid.UUID, melds map[deck.CardRank][]uuid.UUID) error {
+	// If user is opening, total all meld scores
+	openingScore := 0
+	discardInMeld := g.State.TopOfDiscard == nil
+	for cardRank, cardIDs := range melds {
+		if cardRank == deck.Three && !canUserGoOut(userID) {
+			return errors.New("Can't meld 3s unless going out")
+		}
 
-	if g.State.TopOfDiscard != nil {
-		discardInMeld := false
+		if g.State.TopOfDiscard != nil && !discardInMeld {
+			for _, cardID := range cardIDs {
+				if cardID == g.State.TopOfDiscard.ID {
+					discardInMeld = true
+					break
+				}
+			}
+		}
+
+		ph := g.GetPlayerHand(userID)
+		meldCards := []*deck.Card{}
 		for _, cardID := range cardIDs {
-			if cardID == g.State.TopOfDiscard.ID {
-				discardInMeld = true
+			c, err := ph.HandCard(cardID)
+			if err != nil {
+				return err
+			}
+			meldCards = append(meldCards, c)
+		}
+
+		totalMelds := 0
+		var existingMeld []*deck.Card
+		for meldRank, meld := range ph.Melds() {
+			if meldRank != deck.Three {
+				totalMelds++
+			}
+
+			if cardRank == meldRank {
+				existingMeld = meld
 				break
 			}
 		}
 
-		if !discardInMeld {
-			return errors.New("Meld must include top of discard")
-		}
-	}
-
-	ph := g.GetPlayerHand(userID)
-	meldCards := []*deck.Card{}
-	for _, cardID := range cardIDs {
-		c, err := ph.HandCard(cardID)
-		if err != nil {
-			return err
-		}
-		meldCards = append(meldCards, c)
-	}
-
-	totalMelds := 0
-	var existingMeld []*deck.Card
-	for meldRank, meld := range ph.Melds() {
-		if meldRank != deck.Three {
-			totalMelds++
+		if totalMelds == 0 {
+			openingScore += ScoreMeld(meldCards)
 		}
 
-		if cardRank == meldRank {
-			existingMeld = meld
-			break
+		numNaturalCards := 0
+		numWildCards := 0
+
+		if existingMeld != nil {
+			for _, c := range existingMeld {
+				if c.IsWildCard() {
+					numWildCards++
+				} else {
+					numNaturalCards++
+				}
+			}
 		}
-	}
 
-	if totalMelds == 0 {
-		if ScoreMeld(meldCards) < 50 {
-			return errors.New("Need 50 points to start meld")
-		}
-	}
-
-	numNaturalCards := 0
-	numWildCards := 0
-
-	if existingMeld != nil {
-		for _, c := range existingMeld {
+		for _, c := range meldCards {
 			if c.IsWildCard() {
 				numWildCards++
 			} else {
 				numNaturalCards++
 			}
 		}
-	}
 
-	for _, c := range meldCards {
-		if c.IsWildCard() {
-			numWildCards++
-		} else {
-			numNaturalCards++
+		if numNaturalCards < 2 {
+			return errors.New("Need at least 2 natural cards")
+		}
+
+		if numWildCards > 3 {
+			return errors.New("Need 3 or less wild cards")
+		}
+
+		if numNaturalCards+numWildCards < 3 {
+			return errors.New("Need at least 3 cards")
 		}
 	}
 
-	if numNaturalCards < 2 {
-		return errors.New("Need at least 2 natural cards")
+	// TODO: Based on match score
+	meldPoints := 50
+	if 0 < openingScore && openingScore < meldPoints {
+		return MeldError{Message: fmt.Sprintf("Need %d points to open", meldPoints), Code: "not_enough_to_open"}
 	}
 
-	if numWildCards > 3 {
-		return errors.New("Need 3 or less wild cards")
-	}
-
-	if numNaturalCards+numWildCards < 3 {
-		return errors.New("Need at least 3 cards")
+	if !discardInMeld {
+		return errors.New("Meld must include top of discard")
 	}
 
 	return nil

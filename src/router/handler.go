@@ -162,8 +162,6 @@ func (h *Handler) GameState(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Println(userIDs)
-
 	userID, err := uuid.Parse(userIDs[0])
 	if err != nil {
 		fmt.Println(err)
@@ -262,9 +260,8 @@ func (h *Handler) PickPile(w http.ResponseWriter, r *http.Request) {
 }
 
 type MeldRequest struct {
-	UserID   uuid.UUID     `json:"user_id"`
-	MeldRank deck.CardRank `json:"meld_rank"`
-	CardIDs  []uuid.UUID   `json:"card_ids"`
+	UserID uuid.UUID                     `json:"user_id"`
+	Melds  map[deck.CardRank][]uuid.UUID `json:"melds"`
 }
 
 func (h *Handler) Meld(w http.ResponseWriter, r *http.Request) {
@@ -286,8 +283,16 @@ func (h *Handler) Meld(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = game.Meld(h.match.CurrentGame, req.UserID, req.MeldRank, req.CardIDs)
+	err = game.Meld(h.match.CurrentGame, req.UserID, req.Melds)
 	if err != nil {
+		switch err.(type) {
+		case game.MeldError:
+			w.Header().Set("Content-Type", "text/json; charset=utf-8")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(err)
+			return
+		}
+
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}

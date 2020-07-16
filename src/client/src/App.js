@@ -31,6 +31,8 @@ export default class GameView extends React.Component {
       userID: "",
       gameState: null,
       selectedCards: [],
+      selectingMeldRank: false,
+      pendingMeld: null,
     };
   }
 
@@ -151,7 +153,7 @@ export default class GameView extends React.Component {
     }); 
   }
 
-  onClickMeld = () => {
+  onClickMeld = (overrideRank) => {
     var meldRank = "";
     if (this.state.selectedCards.length === 0) {
       alert("Must select cards");
@@ -176,23 +178,76 @@ export default class GameView extends React.Component {
       return;
     }
 
+    if (!meldRank) {
+      if (overrideRank && typeof(overrideRank) === "string") {
+        meldRank = overrideRank;
+        this.setState({ selectingMeldRank: false });
+      } else {
+        // Only wild card selected
+        this.setState({ selectingMeldRank: true });
+        return;
+      }
+    }
+
+    var melds = this.getPendingMelds();
+    melds[meldRank] = this.state.selectedCards;
+
     const requestOptions = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
         user_id: this.state.userID,
-        meld_rank: meldRank,
-        card_ids: this.state.selectedCards,
+        melds,
       })
     };
     fetch('/meld', requestOptions)
     .then(response => {
       if (response.status !== 200) {
-        response.text().then(t => alert(t));
+        response.text().then(t => {
+          try {
+            const err = JSON.parse(t);
+            if (err.code === "not_enough_to_open") {
+              var pendingMeld = this.state.pendingMeld ? this.state.pendingMeld : {};
+              pendingMeld[meldRank] = this.getCardsFromHand(this.state.selectedCards);
+              this.setState({ pendingMeld, selectedCards: [] });
+            } else {
+              alert(JSON.parse(t).message);
+            }
+          } catch {
+            alert(t);
+          }
+        });
       } else {
-        response.json().then(data => this.setState({ gameState: data, selectedCards: [] }));
+        response.json().then(data => this.setState({ gameState: data, selectedCards: [], pendingMeld: null }));
       }
     });
+  }
+
+  getPendingMelds() {
+    if (!this.state.pendingMeld) {
+      return {};
+    }
+
+    var melds = {};
+    for (var rank in this.state.pendingMeld) {
+      melds[rank] = this.state.pendingMeld[rank].map(c => c.id);
+    }
+    return melds;
+  }
+
+  getCardsFromHand(cardIDs) {
+    var cards = [];
+
+    if (!this.state.gameState) {
+      return cards;
+    }
+
+    this.state.gameState.hand.forEach(c => {
+      if (cardIDs.includes(c.id)) {
+        cards.push(c);
+      }
+    })
+    return cards;
   }
 
   makeOnClickCard = (card) => {
@@ -240,13 +295,25 @@ export default class GameView extends React.Component {
       return;
     }
 
-    var sortedHand = this.sortCards(this.state.gameState.hand);
+    var hand = this.state.gameState.hand;
+    if (this.state.pendingMeld) {
+      // Filter out all cards which are pending melds
+      const allPending = [];
+      for (var key in this.state.pendingMeld) {
+        this.state.pendingMeld[key].forEach(c => {
+          allPending.push(c.id);
+        });
+      }
+      hand = hand.filter((c) => !allPending.includes(c.id));
+    }
+
+    hand = this.sortCards(hand);
 
     return (
       <div style={{border: '1px black solid'}}>
         <h3>My Hand</h3>
         <div style={{display: 'inline-block'}}>
-          {sortedHand.map((value, index) => {
+          {hand.map((value, index) => {
           return <div style={{display: 'inline-block'}}>{this.renderCard(value, 'large', this.makeOnClickCard(value))}</div>
         })}
         </div>
@@ -370,7 +437,7 @@ export default class GameView extends React.Component {
     return (
       <div style={{border: '1px black solid'}}>
         <h3>{player.name} has {player.num_cards} cards</h3>
-        {this.renderMeld(this.state.gameState.melds[player.user_id])}
+        {this.renderMeld(this.state.gameState.melds[player.user_id], false)}
       </div>
     )
 
@@ -392,23 +459,48 @@ export default class GameView extends React.Component {
     return (
       <div style={{border: '1px black solid'}}>
         <h3>My Melds</h3>
-        {this.renderMeld(this.state.gameState.melds[this.state.userID])}
+        {this.renderMeld(this.state.gameState.melds[this.state.userID], true)}
       </div>
     );
   }
 
-  renderMeld(meld) {
+  renderPendingMeld() {
+    if (!this.state.pendingMeld) {
+      return;
+    }
+
+    return (
+      <div style={{border: '1px black solid'}}>
+        <h3>Pending Melds</h3>
+        {this.renderMeld(this.state.pendingMeld, false)}
+        <WrappedButton onClick={this.onCancelPendingMeld}>Cancel</WrappedButton>
+      </div>
+    )
+  }
+
+  onCancelPendingMeld = () => {
+    this.setState({ pendingMeld: null });
+  }
+
+  renderMeld(meld, isMyMeld) {
     var melds = [];
     for (const rank in meld) {
       var data = this.countMeld(meld[rank], rank);
       melds.push((
         <li>
-          {data.naturalCount+data.wildCount < 7 ? this.renderNonCanasta(rank, data.naturalCount, data.wildCount) : this.renderCanasta(rank, data.wildCount)}
+          {data.naturalCount+data.wildCount < 7 ? this.renderNonCanasta(rank, data.naturalCount, data.wildCount, isMyMeld) : this.renderCanasta(rank, data.wildCount)}
         </li>
       ));
-    }    
+    }   
+
+    var disclaimer = '';
+    if (this.state.selectingMeldRank) {
+      disclaimer = (<div>Must select meld rank!</div>);
+    } 
+
     return (
       <div>
+        {disclaimer}
         <ul>
           {melds}
         </ul>
@@ -432,23 +524,31 @@ export default class GameView extends React.Component {
   renderCanasta(rank, wildCount) {
     return (
       <div style={{display: 'inline-block'}}>
-        {this.renderMeldCard(rank, wildCount)}
+        {this.renderMeldCard(rank, wildCount, null)}
         Canasta!
       </div>
     );
   }
 
-  renderNonCanasta(rank, naturalCount, wildCount) {
+  makeOnClickMeld = (rank) => {
+    return () => {
+      this.onClickMeld(rank);
+    }
+  }
+
+  renderNonCanasta(rank, naturalCount, wildCount, isMyMeld) {
+    var cb = isMyMeld && this.state.selectingMeldRank && rank !== '3' ? this.makeOnClickMeld(rank) : null;
+
     return (
       <div style={{display: 'inline-block'}}>
-        {this.renderMeldCard(rank, wildCount)}
+        {this.renderMeldCard(rank, wildCount, cb)}
         {rank}s: {naturalCount}, wild: {wildCount}
       </div>
     );
   }
 
-  renderMeldCard(rank, wildCount) {
-    return this.renderCard({rank, suit: wildCount > 0 ? 'spades': 'hearts'}, 'small', null);
+  renderMeldCard(rank, wildCount, onClick) {
+    return this.renderCard({rank, suit: wildCount > 0 ? 'spades': 'hearts'}, 'small', onClick);
   }
 
   render() {
@@ -465,6 +565,7 @@ export default class GameView extends React.Component {
         </Container>
         <Container className="my_hand">
           <Row>{this.renderMyMeld()}</Row>
+          <Row>{this.renderPendingMeld()}</Row>
           <Row>{this.renderHand()}</Row>
         </Container>
         <Container className="action_panel">
