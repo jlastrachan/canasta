@@ -81,7 +81,11 @@ func GetDeck(numDecks int) *Deck {
 		})
 	}
 
-	deck.Shuffle()
+	for i := 0; i < 3; i++ {
+		// Shuffle the deck 3 times
+		deck.Shuffle()
+	}
+
 	return deck
 }
 
