@@ -9,9 +9,9 @@ import (
 type Status string
 
 const (
-	Idle      Status = "Idle"
-	InGame           = "InGame"
-	MatchOver        = "MatchOver"
+	Idle      Status = "IDLE"
+	InGame           = "IN_GAME"
+	MatchOver        = "MATCH_OVER"
 )
 
 type Match struct {
@@ -40,4 +40,16 @@ func (m *Match) StartWithUsers(users []*user.User) {
 	}
 
 	m.CurrentGame.StartWithUsers(users, m.FirstTurn)
+	m.Status = InGame
+}
+
+func (m *Match) ContinueNextHand() {
+	m.FirstTurn = (m.FirstTurn + 1) % len(m.Users)
+	m.CurrentGame = game.Init()
+	m.CurrentGame.StartWithUsers(m.Users, m.FirstTurn)
+	m.Status = InGame
+}
+
+func (m *Match) UpdateScores(userID uuid.UUID, score int) {
+	m.Scores[userID] += score
 }

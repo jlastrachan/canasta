@@ -41,7 +41,10 @@ export default class GameView extends React.Component {
       return;
     }
 
-    if (this.state.gameState.turn !== this.state.userID) {
+    const anotherUsersTurn = this.state.gameState.turn !== this.state.userID;
+    const betweenHands = this.state.gameState.match_state === 'IDLE';
+
+    if (anotherUsersTurn || betweenHands) {
       setTimeout(() => {
         this.getGameState();
       }, 1000)
@@ -153,6 +156,13 @@ export default class GameView extends React.Component {
     }); 
   }
 
+  onContinueHand = () => {
+    const requestOptions = {
+      method: 'POST',
+    };
+    fetch('/continue', requestOptions).then(this.getGameState);
+  }
+
   onClickMeld = (overrideRank) => {
     var meldRank = "";
     if (this.state.selectedCards.length === 0) {
@@ -259,7 +269,7 @@ export default class GameView extends React.Component {
       return null;
     }
 
-    if (!(this.state.gameState.status === 'PICKED_DISCARD_PILE' || this.state.gameState.status === 'PLAYING_TURN')) {
+    if (!(this.state.gameState.hand_status === 'PICKED_DISCARD_PILE' || this.state.gameState.hand_status === 'PLAYING_TURN')) {
       return null;
     }
 
@@ -308,10 +318,11 @@ export default class GameView extends React.Component {
     }
 
     hand = this.sortCards(hand);
+    const score = this.state.gameState.scores[this.state.userID];
 
     return (
       <div style={{border: '1px black solid'}}>
-        <h3>My Hand</h3>
+        <h3>My Hand (Score {score})</h3>
         <div style={{display: 'inline-block'}}>
           {hand.map((value, index) => {
           return <div style={{display: 'inline-block'}}>{this.renderCard(value, 'large', this.makeOnClickCard(value))}</div>
@@ -365,7 +376,7 @@ export default class GameView extends React.Component {
       return <h3>Not your turn</h3>;
     }
 
-    const gameState = this.state.gameState.status;
+    const gameState = this.state.gameState.hand_status;
 
     if (gameState === 'AWAITING_TURN') {
       return (
@@ -434,10 +445,11 @@ export default class GameView extends React.Component {
     }
 
     const player = this.state.gameState.players[playerIndex];
+    const score = this.state.gameState.scores[player.user_id];
 
     return (
       <div style={{border: '1px black solid'}}>
-        <h3>{player.name} has {player.num_cards} cards</h3>
+        <h3>{player.name} has {player.num_cards} cards (Score {score})</h3>
         {this.renderMeld(this.state.gameState.melds[player.user_id], false)}
       </div>
     )
@@ -488,9 +500,9 @@ export default class GameView extends React.Component {
     for (const rank in meld) {
       var data = this.countMeld(meld[rank], rank);
       melds.push((
-        <li>
+        <div style={{display: 'inline-block', paddingRight: '5px',border: '1px red dashed'}}>
           {data.naturalCount+data.wildCount < 7 ? this.renderNonCanasta(rank, data.naturalCount, data.wildCount, isMyMeld) : this.renderCanasta(rank, data.wildCount)}
-        </li>
+        </div>
       ));
     }   
 
@@ -502,9 +514,9 @@ export default class GameView extends React.Component {
     return (
       <div>
         {disclaimer}
-        <ul>
+        <div>
           {melds}
-        </ul>
+        </div>
       </div>
     )
   }
@@ -552,15 +564,17 @@ export default class GameView extends React.Component {
     return this.renderCard({rank, suit: wildCount > 0 ? 'spades': 'hearts'}, 'small', onClick);
   }
 
-  render() {
+  renderInGame() {
+    if (!this.state.gameState) {
+      return;
+    }
+
+    if (this.state.gameState.match_status !== 'IN_GAME') {
+      return;
+    }
+
     return (
-      <div className="GameView">
-        <Container className="header">
-          <WrappedButton onClick={this.onJoinGameClick}>Join Game</WrappedButton>
-          <input type="text" name="name" onChange={this.onTextChange.bind(this)}/>
-          <WrappedButton onClick={this.onStartGame}>Start Game</WrappedButton>
-          <WrappedButton onClick={this.onClearGame}>Clear Game</WrappedButton>
-        </Container>
+      <div>
         <Container className="body">
           {this.renderBody()}
         </Container>
@@ -572,6 +586,52 @@ export default class GameView extends React.Component {
         <Container className="action_panel">
           <Row><div style={{paddingTop: '10px'}}>{this.renderActions()}</div></Row>
         </Container>
+      </div>
+    );
+  }
+
+  renderHandEnded() {
+    if (!this.state.gameState) {
+      return;
+    }
+
+    if (this.state.gameState.match_status === 'IN_GAME') {
+      // Render for between hands or game over
+      return;
+    }
+
+    const scores = [];
+    scores.push(<li>My Score: {this.state.gameState.scores[this.state.userID]}</li>);
+    this.state.gameState.players.forEach(p => {
+      scores.push(<li>{p.name} Score: {this.state.gameState.scores[p.user_id]}</li>);
+    });
+
+    var nextGameButton = null;
+    if (this.state.gameState.match_status === 'IDLE') {
+      nextGameButton = <WrappedButton onClick={this.onContinueHand}>Next Hand</WrappedButton>;
+    }
+
+    return (
+      <Container>
+        <ul>
+          {scores}
+        </ul>
+        {nextGameButton}
+      </Container>
+    );
+  }
+
+  render() {
+    return (
+      <div className="GameView">
+        <Container className="header">
+          <WrappedButton onClick={this.onJoinGameClick}>Join Game</WrappedButton>
+          <input type="text" name="name" onChange={this.onTextChange.bind(this)}/>
+          <WrappedButton onClick={this.onStartGame}>Start Game</WrappedButton>
+          <WrappedButton onClick={this.onClearGame}>Clear Game</WrappedButton>
+        </Container>
+        {this.renderInGame()}
+        {this.renderHandEnded()}
       </div>
     );
   }

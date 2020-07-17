@@ -1,6 +1,9 @@
 package game
 
-import "github.com/jlastrachan/canasta/src/models/deck"
+import (
+	"github.com/jlastrachan/canasta/src/models/deck"
+	"github.com/jlastrachan/canasta/src/models/player_hand"
+)
 
 var scores = map[deck.CardRank]int{
 	deck.Four:  5,
@@ -18,11 +21,62 @@ var scores = map[deck.CardRank]int{
 	deck.Joker: 50,
 }
 
-// ScoreMeld Returns the score for a proposed group of cards for melding
-func ScoreMeld(meld []*deck.Card) int {
+// ScoreCards Returns the score for a proposed group of cards for melding
+func ScoreCards(meld []*deck.Card) int {
 	totalScore := 0
 	for _, card := range meld {
-		totalScore += scores[card.Rank]
+		if card.Rank == deck.Three {
+			if card.IsRedThree() {
+				totalScore += 100
+			} else {
+				totalScore += 5
+			}
+		} else {
+			totalScore += scores[card.Rank]
+		}
 	}
+	return totalScore
+}
+
+func ScoreForHand(ph *player_hand.PlayerHand, didUserGoOut bool) int {
+	totalScore := 0
+
+	if didUserGoOut {
+		totalScore += 100
+	}
+
+	for meldRank, cards := range ph.Melds() {
+		if meldRank == deck.Three && len(cards) == 4 {
+			allRedThrees := true
+			for _, c := range cards {
+				if !c.IsRedThree() {
+					allRedThrees = false
+				}
+			}
+			// If has all 4 red threes, get an extra 400 points
+			if allRedThrees {
+				totalScore += 400
+			}
+		}
+
+		if len(cards) >= 7 {
+			totalScore += 300
+			hasWildCard := false
+			for _, card := range cards {
+				if card.Rank != meldRank {
+					hasWildCard = true
+					break
+				}
+			}
+			if !hasWildCard {
+				totalScore += 200
+			}
+		}
+
+		totalScore += ScoreCards(cards)
+	}
+
+	// Subtract cards in hand
+	totalScore -= ScoreCards(ph.Hand())
 	return totalScore
 }

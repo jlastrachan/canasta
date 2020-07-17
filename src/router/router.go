@@ -24,6 +24,7 @@ func Serve() *http.ServeMux {
 	mux.HandleFunc("/pick_pile", h.PickPile)
 	mux.HandleFunc("/meld", h.Meld)
 	mux.HandleFunc("/discard", h.Discard)
+	mux.HandleFunc("/continue", h.ContinueNextHand)
 	mux.HandleFunc("/", h.GetIndexHandler(buildPath))
 	return mux
 }

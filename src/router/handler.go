@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jlastrachan/canasta/src/game"
 	"github.com/jlastrachan/canasta/src/models/deck"
+	game_model "github.com/jlastrachan/canasta/src/models/game"
 	"github.com/jlastrachan/canasta/src/models/match"
 	"github.com/jlastrachan/canasta/src/models/user"
 	"github.com/jlastrachan/canasta/src/webpack"
@@ -169,7 +170,7 @@ func (h *Handler) GameState(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ret, err := game.GetGameState(h.match.CurrentGame, userID)
+	ret, err := game.GetGameState(h.match, userID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -215,7 +216,7 @@ func (h *Handler) PickCard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ret, err := game.GetGameState(h.match.CurrentGame, req.UserID)
+	ret, err := game.GetGameState(h.match, req.UserID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -249,7 +250,7 @@ func (h *Handler) PickPile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ret, err := game.GetGameState(h.match.CurrentGame, req.UserID)
+	ret, err := game.GetGameState(h.match, req.UserID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -283,7 +284,7 @@ func (h *Handler) Meld(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = game.Meld(h.match.CurrentGame, req.UserID, req.Melds)
+	err = game.Meld(h.match, req.UserID, req.Melds)
 	if err != nil {
 		switch err.(type) {
 		case game.MeldError:
@@ -297,7 +298,9 @@ func (h *Handler) Meld(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ret, err := game.GetGameState(h.match.CurrentGame, req.UserID)
+	h.updateScoresIfHandEnded()
+
+	ret, err := game.GetGameState(h.match, req.UserID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -337,7 +340,9 @@ func (h *Handler) Discard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ret, err := game.GetGameState(h.match.CurrentGame, req.UserID)
+	h.updateScoresIfHandEnded()
+
+	ret, err := game.GetGameState(h.match, req.UserID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -345,6 +350,41 @@ func (h *Handler) Discard(w http.ResponseWriter, r *http.Request) {
 
 	okStatus(w)
 	json.NewEncoder(w).Encode(ret)
+}
+
+func (h *Handler) updateScoresIfHandEnded() {
+	if h.match.CurrentGame.State.Status != game_model.HandEnded || h.match.Status != match.InGame {
+		return
+	}
+
+	for _, u := range h.match.Users {
+		ph := h.match.CurrentGame.GetPlayerHand(u.ID)
+
+		h.match.UpdateScores(u.ID, game.ScoreForHand(ph, len(ph.Hand()) == 0))
+	}
+
+	matchStatus := match.Idle
+	for _, score := range h.match.Scores {
+		if score >= 5000 {
+			matchStatus = match.MatchOver
+		}
+	}
+	h.match.Status = matchStatus
+}
+
+func (h *Handler) ContinueNextHand(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.NotFound(w, r)
+		return
+	}
+
+	if h.match.Status != match.Idle {
+		http.NotFound(w, r)
+		return
+	}
+
+	game.ContinueNextHand(h.match)
+	okStatus(w)
 }
 
 // User represents current user session

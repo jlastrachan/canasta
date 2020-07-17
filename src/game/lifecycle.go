@@ -41,6 +41,18 @@ func StartGame(m *match.Match, userModel *user.UserModel) {
 	}
 }
 
+// ContinueNextHand TODO
+func ContinueNextHand(m *match.Match) {
+	m.ContinueNextHand()
+
+	// Deal out the first hand
+	for _, u := range m.Users {
+		for i := 0; i < getNumCardsPerHand(len(m.Users)); i++ {
+			dealCard(m.CurrentGame, u.ID)
+		}
+	}
+}
+
 // GetHand TODO
 func GetHand(gameModel *game_model.Game, userID uuid.UUID) []*deck.Card {
 	return gameModel.GetPlayerHand(userID).Hand()
@@ -49,12 +61,14 @@ func GetHand(gameModel *game_model.Game, userID uuid.UUID) []*deck.Card {
 // GameState TODO
 type GameState struct {
 	Hand          []*deck.Card                                 `json:"hand"`
-	State         game_model.GameStatus                        `json:"status"`
+	GameState     game_model.GameStatus                        `json:"hand_status"`
+	MatchState    match.Status                                 `json:"match_status"`
 	Turn          uuid.UUID                                    `json:"turn"`
 	Players       []*GamePlayer                                `json:"players"`
 	TopOfDiscard  *deck.Card                                   `json:"top_of_discard"`
 	DiscardLength int                                          `json:"discard_length"`
 	Melds         map[uuid.UUID]map[deck.CardRank][]*deck.Card `json:"melds"`
+	Scores        map[uuid.UUID]int                            `json:"scores"`
 }
 
 // GamePlayer TODO
@@ -65,7 +79,8 @@ type GamePlayer struct {
 }
 
 // GetGameState TODO
-func GetGameState(gameModel *game_model.Game, userID uuid.UUID) (GameState, error) {
+func GetGameState(m *match.Match, userID uuid.UUID) (GameState, error) {
+	gameModel := m.CurrentGame
 	if len(gameModel.Users) == 0 {
 		return GameState{}, errors.New("No current game")
 	}
@@ -94,12 +109,14 @@ func GetGameState(gameModel *game_model.Game, userID uuid.UUID) (GameState, erro
 
 	return GameState{
 		Hand:          gameModel.GetPlayerHand(userID).Hand(),
-		State:         gameModel.State.Status,
+		GameState:     gameModel.State.Status,
+		MatchState:    m.Status,
 		Turn:          gameModel.Users[gameModel.State.Turn].ID,
 		Players:       gamePlayers,
 		Melds:         melds,
 		TopOfDiscard:  topOfDiscard,
 		DiscardLength: len(gameModel.Deck.GetDiscard()),
+		Scores:        m.Scores,
 	}, nil
 }
 
@@ -116,8 +133,9 @@ func dealCard(g *game_model.Game, userID uuid.UUID) {
 }
 
 // Meld Melds the provided cards with the provided rank for the user
-func Meld(g *game_model.Game, userID uuid.UUID, melds map[deck.CardRank][]uuid.UUID) error {
-	err := isValidMeld(g, userID, melds)
+func Meld(m *match.Match, userID uuid.UUID, melds map[deck.CardRank][]uuid.UUID) error {
+	g := m.CurrentGame
+	err := isValidMeld(m, userID, melds)
 	if err != nil {
 		return err
 	}
@@ -125,17 +143,34 @@ func Meld(g *game_model.Game, userID uuid.UUID, melds map[deck.CardRank][]uuid.U
 	for cardRank, cardIDs := range melds {
 		g.Meld(userID, cardRank, cardIDs)
 	}
+
+	if len(g.GetPlayerHand(userID).Hand()) == 0 {
+		endHand(g, userID)
+	}
+
 	return nil
 }
 
-// TODO: could be multiple melds
-func isValidMeld(g *game_model.Game, userID uuid.UUID, melds map[deck.CardRank][]uuid.UUID) error {
-	// If user is opening, total all meld scores
+func isValidMeld(m *match.Match, userID uuid.UUID, melds map[deck.CardRank][]uuid.UUID) error {
+	g := m.CurrentGame
 	openingScore := 0
 	discardInMeld := g.State.TopOfDiscard == nil
+	totalCardsInMeld := 0
+	hasCanasta := false
+	ph := g.GetPlayerHand(userID)
+
 	for cardRank, cardIDs := range melds {
-		if cardRank == deck.Three && !canUserGoOut(userID) {
-			return errors.New("Can't meld 3s unless going out")
+		totalCardsInMeld += len(cardIDs)
+		if cardRank == deck.Three {
+			if len(cardIDs) < 3 {
+				return errors.New("Must meld 3 or more 3s when going out")
+			}
+
+			// TODO: This doesn't work when there's more than 1 meld
+			if (len(ph.Hand()) - len(cardIDs)) > 1 {
+				return errors.New("Can't meld 3s unless going out")
+			}
+
 		}
 
 		if g.State.TopOfDiscard != nil && !discardInMeld {
@@ -147,7 +182,6 @@ func isValidMeld(g *game_model.Game, userID uuid.UUID, melds map[deck.CardRank][
 			}
 		}
 
-		ph := g.GetPlayerHand(userID)
 		meldCards := []*deck.Card{}
 		for _, cardID := range cardIDs {
 			c, err := ph.HandCard(cardID)
@@ -171,7 +205,7 @@ func isValidMeld(g *game_model.Game, userID uuid.UUID, melds map[deck.CardRank][
 		}
 
 		if totalMelds == 0 {
-			openingScore += ScoreMeld(meldCards)
+			openingScore += ScoreCards(meldCards)
 		}
 
 		numNaturalCards := 0
@@ -206,10 +240,13 @@ func isValidMeld(g *game_model.Game, userID uuid.UUID, melds map[deck.CardRank][
 		if numNaturalCards+numWildCards < 3 {
 			return errors.New("Need at least 3 cards")
 		}
+
+		if numNaturalCards+numWildCards >= 7 {
+			hasCanasta = true
+		}
 	}
 
-	// TODO: Based on match score
-	meldPoints := 50
+	meldPoints := getOpeningScore(m.Scores[userID])
 	if 0 < openingScore && openingScore < meldPoints {
 		return MeldError{Message: fmt.Sprintf("Need %d points to open", meldPoints), Code: "not_enough_to_open"}
 	}
@@ -218,7 +255,34 @@ func isValidMeld(g *game_model.Game, userID uuid.UUID, melds map[deck.CardRank][
 		return errors.New("Meld must include top of discard")
 	}
 
+	if len(ph.Hand())-totalCardsInMeld <= 1 {
+		// Must have a canasta in order to go out
+		if !hasCanasta {
+			for _, meld := range ph.Melds() {
+				if len(meld) >= 7 {
+					hasCanasta = true
+				}
+			}
+		}
+
+		if !hasCanasta {
+			return errors.New("Must have a canasta in order to go out")
+		}
+	}
+
 	return nil
+}
+
+func getOpeningScore(currentPoints int) int {
+	if currentPoints < 0 {
+		return 15
+	} else if currentPoints < 1500 {
+		return 50
+	} else if currentPoints < 3000 {
+		return 90
+	} else {
+		return 120
+	}
 }
 
 // PickCard User opts to pick a new card for their turn
@@ -319,9 +383,8 @@ func Discard(g *game_model.Game, userID uuid.UUID, cardID uuid.UUID) error {
 	ph.RemoveCardFromHand(cardID)
 	g.Deck.Discard(card)
 
-	if canUserGoOut(userID) {
-		EndHand()
-		return nil
+	if len(ph.Hand()) == 0 {
+		return endHand(g, userID)
 	}
 
 	g.SetState(game_model.State{
@@ -332,10 +395,41 @@ func Discard(g *game_model.Game, userID uuid.UUID, cardID uuid.UUID) error {
 	return nil
 }
 
-func canUserGoOut(userID uuid.UUID) bool {
-	return false
+// EndHand The hand is over, handles scoring
+func endHand(g *game_model.Game, userID uuid.UUID) error {
+	ph := g.GetPlayerHand(userID)
+
+	if !g.IsGameInProgress() {
+		return errors.New("No in-progress hand to end")
+	}
+
+	if len(ph.Hand()) != 0 {
+		return errors.New("Can't end hand with > 0 cards in hand")
+	}
+
+	if !doesUserHaveCanasta(g, userID) {
+		return errors.New("Can't end hand without having a canasta")
+	}
+
+	g.SetState(game_model.State{
+		Status: game_model.HandEnded,
+	})
+
+	return nil
 }
 
-// EndHand The hand is over, handles scoring
-func EndHand() {
+func doesUserHaveCanasta(g *game_model.Game, userID uuid.UUID) bool {
+	ph := g.GetPlayerHand(userID)
+	melds := ph.Melds()
+
+	for meldRank, meldCards := range melds {
+		if meldRank == deck.Three {
+			continue
+		}
+
+		if len(meldCards) >= 7 {
+			return true
+		}
+	}
+	return false
 }

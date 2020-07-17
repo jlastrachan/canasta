@@ -23,10 +23,19 @@ const (
 
 	// HandEnded The current hand has ended, but the game isn't over
 	HandEnded = "HAND_ENDED"
-
-	// GameOver A player has won and the game is over
-	GameOver = "GAME_OVER"
 )
+
+var inProgressStates = map[GameStatus]bool{
+	AwaitingTurn:      true,
+	PickedDiscardPile: true,
+	PlayingTurn:       true,
+}
+
+// IsGameInProgress whether there is an ongoing game
+func (g *Game) IsGameInProgress() bool {
+	_, isOk := inProgressStates[g.State.Status]
+	return isOk
+}
 
 // Game The base model of the game
 type Game struct {
