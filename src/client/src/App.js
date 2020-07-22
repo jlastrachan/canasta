@@ -5,6 +5,7 @@ import Button from 'react-bootstrap/Button';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
+import GameController from './GameController';
 
 const rankToOrdinal = {
   'Ace': 1,
@@ -23,7 +24,7 @@ const rankToOrdinal = {
   'Joker': 14,
 }
 
-export default class GameView extends React.Component {
+export default class App extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
@@ -622,17 +623,20 @@ export default class GameView extends React.Component {
   }
 
   render() {
+    // return (
+    //   <div className="GameView">
+    //     <Container className="header">
+    //       <WrappedButton onClick={this.onJoinGameClick}>Join Game</WrappedButton>
+    //       <input type="text" name="name" onChange={this.onTextChange.bind(this)}/>
+    //       <WrappedButton onClick={this.onStartGame}>Start Game</WrappedButton>
+    //       <WrappedButton onClick={this.onClearGame}>Clear Game</WrappedButton>
+    //     </Container>
+    //     {this.renderInGame()}
+    //     {this.renderHandEnded()}
+    //   </div>
+    // );
     return (
-      <div className="GameView">
-        <Container className="header">
-          <WrappedButton onClick={this.onJoinGameClick}>Join Game</WrappedButton>
-          <input type="text" name="name" onChange={this.onTextChange.bind(this)}/>
-          <WrappedButton onClick={this.onStartGame}>Start Game</WrappedButton>
-          <WrappedButton onClick={this.onClearGame}>Clear Game</WrappedButton>
-        </Container>
-        {this.renderInGame()}
-        {this.renderHandEnded()}
-      </div>
+      <GameController />
     );
   }
 }
