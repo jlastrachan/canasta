@@ -1,5 +1,5 @@
 import React from 'react';
-import { Card as CardType, Rank, rankToOrdinal } from '../types';
+import { Card as CardType, MeldMap, Rank, rankToOrdinal } from '../types';
 import Button from 'react-bootstrap/Button';
 import { Card } from './Card';
 import { Melds } from './Melds';
@@ -65,18 +65,40 @@ export class MyHand extends React.Component<MyHandProps, {}> {
 }
 
 interface MyMeldProps {
-    melds: Map<Rank, Array<CardType>>,
+    melds: MeldMap,
+    onClickMeldFactory?: (rank: Rank) => (() => void) | undefined,
+    pendingMelds?: MeldMap,
+    onCancelPendingMelds: () => void,
 }
 
 export const MyMelds: React.FunctionComponent<MyMeldProps> = (props: MyMeldProps) => {
+    let pendingMeldSection: JSX.Element | null = null;
+    if (props.pendingMelds) {
+        pendingMeldSection = (
+            <div style={{ borderBottom: '1px solid black' }}>
+                <div className="d-flex justify-content-between my-hand-header p-3">
+                    <h3>Pending Melds</h3>
+                    <Button variant="outline-secondary" onClick={props.onCancelPendingMelds}>Cancel</Button>
+                </div>
+                <div className="p-3">
+                    <Melds
+                        melds={props.pendingMelds}
+                    />
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div style={{ height: '100%' }} className="my-hand-container">
+            {pendingMeldSection}
             <div className="my-hand-header p-3">
                 <h3>Melds</h3>
             </div>
             <div className="p-3">
                 <Melds
                     melds={props.melds}
+                    onClickMeldFactory={props.onClickMeldFactory}
                 />
             </div>
         </div>

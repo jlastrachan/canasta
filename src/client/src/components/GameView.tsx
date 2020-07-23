@@ -3,7 +3,7 @@ import Container from 'react-bootstrap/esm/Container';
 import Col from 'react-bootstrap/Col';
 import Row from 'react-bootstrap/Row';
 import { OtherPlayer } from './OtherPlayer';
-import { Card, GameActions, GameState, GamePlayer } from '../types';
+import { Card, GameActions, GameState, GamePlayer, MeldMap, Rank } from '../types';
 import { DiscardPile } from './DiscardPile';
 import { MyHand, MyMelds } from './MyHand';
 
@@ -17,6 +17,9 @@ interface GameViewProps {
     gameState: GameState
     selectedCards: Array<string>
     onClickCardFactory: (c: Card) => (() => void) | undefined
+    onClickMeldFactory?: (r: Rank) => (() => void) | undefined
+    pendingMelds?: MeldMap
+    onCancelPendingMelds: () => void
 }
 
 export class GameView extends React.Component<GameViewProps, {}> {
@@ -31,7 +34,7 @@ export class GameView extends React.Component<GameViewProps, {}> {
                     gamePlayer={player}
                     isTurn={this.props.gameState.turn === player.user_id}
                     score={this.props.gameState.scores[player.user_id]}
-                    melds={this.props.gameState.melds.get(player.user_id)}
+                    melds={this.props.gameState.melds[player.user_id]}
                 />
             </Col>
         );
@@ -52,11 +55,23 @@ export class GameView extends React.Component<GameViewProps, {}> {
     }
 
     renderMyHand() {
+        let hand = this.props.gameState.hand;
+        if (this.props.pendingMelds) {
+            // Filter out all cards which are pending melds
+            const allPending: string[] = [];
+            for (var key in this.props.pendingMelds) {
+                this.props.pendingMelds[key as Rank]!.forEach(c => {
+                    allPending.push(c.id);
+                });
+            }
+            hand = hand.filter((c) => !allPending.includes(c.id));
+        }
+
         return (
             <div>
                 <MyHand 
                     isTurn={this.props.gameState.turn === this.props.userID}
-                    hand={this.props.gameState.hand}
+                    hand={hand}
                     score={this.props.gameState.scores[this.props.userID]}
                     onClickMeld={this.canDoAction(GameActions.Meld) ? this.props.onMeldClick: undefined}
                     selectedCards={this.props.selectedCards}
@@ -70,7 +85,10 @@ export class GameView extends React.Component<GameViewProps, {}> {
         return (
             <div style={{ height: '100%' }}>
                 <MyMelds
-                    melds={this.props.gameState.melds.get(this.props.userID)!}
+                    melds={this.props.gameState.melds[this.props.userID]}
+                    onClickMeldFactory={this.props.onClickMeldFactory}
+                    pendingMelds={this.props.pendingMelds}
+                    onCancelPendingMelds={this.props.onCancelPendingMelds}
                 />
             </div>
         );

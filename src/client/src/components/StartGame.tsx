@@ -3,6 +3,7 @@ import Button from 'react-bootstrap/Button';
 import ListGroup from 'react-bootstrap/ListGroup';
 import InputGroup from 'react-bootstrap/InputGroup';
 import FormControl from 'react-bootstrap/FormControl';
+import Form from 'react-bootstrap/Form';
 
 interface StartGameProps {
     userNames: Array<string>,
@@ -27,7 +28,9 @@ export class StartGame extends React.Component<StartGameProps, StartGameState> {
         this.nameInput?.focus();
     }
 
-    onAddUserClick = () => {
+    onAddUserClick = (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+
         if (this.state.name !== '') {
             this.props.onAddUserClick(this.state.name);
         }
@@ -39,18 +42,20 @@ export class StartGame extends React.Component<StartGameProps, StartGameState> {
 
     renderAddPlayer() {
         return (
-            <InputGroup className="add-player-input">
-                <FormControl
-                    placeholder="Player Name"
-                    aria-label="Player Name"
-                    aria-describedby="basic-addon2"
-                    ref={(input: HTMLInputElement) => { this.nameInput = input; }} 
-                    onChange={this.onNameChange}
-                />
-                <InputGroup.Append>
-                    <Button variant="outline-secondary" onClick={this.onAddUserClick}>Add Player</Button>
-                </InputGroup.Append>
-            </InputGroup>
+            <Form onSubmit={this.onAddUserClick}>
+                <InputGroup className="add-player-input">
+                    <FormControl
+                        placeholder="Player Name"
+                        aria-label="Player Name"
+                        aria-describedby="basic-addon2"
+                        ref={(input: HTMLInputElement) => { this.nameInput = input; }} 
+                        onChange={this.onNameChange}
+                    />
+                    <InputGroup.Append>
+                        <Button variant="outline-secondary" type="submit">Add Player</Button>
+                    </InputGroup.Append>
+                </InputGroup>
+            </Form>
         );
     }
 
@@ -67,10 +72,10 @@ export class StartGame extends React.Component<StartGameProps, StartGameState> {
 
     render() { 
         return (
-            <div className="d-flex justify-content-center align-items-center" style={{ height: '100%' }}>
+            <div className="d-flex justify-content-center align-items-center" style={{ height: '75%' }}>
                 <div style={{ width: '400px' }}>
                     <h2>Start New Game</h2>
-                    <div className="name-list">{this.renderNames()}</div>
+                    <div className="pt-3 pb-3">{this.renderNames()}</div>
                     <Button variant="primary" size="lg" block onClick={this.props.onStartGameClick}>
                         Start Game
                     </Button>

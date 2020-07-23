@@ -12,11 +12,6 @@ code {
     monospace;
 }
 
-.name-list {
-  padding-top: 24px;
-  padding-bottom: 24px;
-}
-
 .add-player-input {
   height: 49px;
 }
@@ -106,4 +101,24 @@ code {
 
 .card-selectable.card-selected:hover {
   border: 5px solid black;
+}
+
+.score-table-rank {
+  width: 80px;
+}
+
+.score-table-name {
+  width: 160px;
+}
+
+.score-table-value {
+  width: 160px;
+}
+
+.score-table-row {
+  border-top: 1px solid #dee2e6;
+}
+
+.canasta-crown {
+  width: 50px;
 }

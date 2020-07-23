@@ -1,12 +1,12 @@
 import React from 'react';
-import { GamePlayer, Card, Rank } from '../types';
+import { GamePlayer, MeldMap } from '../types';
 import { Melds } from './Melds';
 import { BackCard } from './Card';
 
 interface OtherPlayerProps {
     gamePlayer: GamePlayer,
     score: number,
-    melds?: Map<Rank, Array<Card>>,
+    melds?: MeldMap,
     isTurn: boolean,
 }
 

@@ -1,13 +1,10 @@
 import React from 'react';
-import { Card, rankToOrdinal, Rank, Suit } from '../types';
-import Col from 'react-bootstrap/Col';
-import Row from 'react-bootstrap/Row';
-import { Card as CardComponent } from './Card';
-
-const meldsPerRow = 3;
+import { Card, rankToOrdinal, Rank, Suit, MeldMap } from '../types';
+import { Card as CardComponent, CardProps } from './Card';
 
 interface MeldProps {
-    melds: Map<Rank, Array<Card>>,
+    melds?: MeldMap,
+    onClickMeldFactory?: (rank: Rank) => (() => void) | undefined,
 }
 
 interface MeldCount {
@@ -16,7 +13,7 @@ interface MeldCount {
     totalCount: number,
 }
 
-type RankMeldPair = [Rank, Card[]];
+type MeldEntry = [string, Card[] | undefined];
 
 export class Melds extends React.Component<MeldProps, {}> {
     displayRank(rank: Rank): string {
@@ -45,28 +42,36 @@ export class Melds extends React.Component<MeldProps, {}> {
         return {naturalCount, wildCount, totalCount: naturalCount + wildCount};
     }
 
-    renderSingleMeld(rankMeldPair: [Rank, Array<Card>]) {
-        const meldCount = this.countMeld(rankMeldPair[0], rankMeldPair[1]);
+    renderMeldCard(c: Card, meldCount: MeldCount) {
+        const onClickCard = this.props.onClickMeldFactory ? this.props.onClickMeldFactory(c.rank) : undefined;
 
-        const card: Card = { rank: rankMeldPair[0], suit: meldCount.wildCount > 0 ? Suit.Spades: Suit.Hearts, id: 'fake' };
+        let cardProps: CardProps = {
+            size: 'small',
+            isSelected: false,
+            card: c,
+            onClick: onClickCard,
+        };
 
-        let meldCard: JSX.Element;
-        if (meldCount.totalCount > 7) {
-            meldCard = <CardComponent size="small" isSelected={false} card={card}></CardComponent>;
-        } else {
-            meldCard = <CardComponent size="small" isSelected={false} card={card}></CardComponent>;
+        if (meldCount.totalCount >= 7) {
+            cardProps.isCanasta = true;
         }
 
+        return <CardComponent {...cardProps} />;
+    }
+
+    renderSingleMeld(rank: Rank, cards: Array<Card>) {
+        const meldCount = this.countMeld(rank, cards);
+
+        const card: Card = { rank, suit: meldCount.wildCount > 0 ? Suit.Spades: Suit.Hearts, id: 'fake' };
+
         return (
-            <Col md="4">
-                <div className="d-flex align-items-center">
-                    {meldCard}
-                    <div className="d-flex flex-column pl-2">
-                        <div><b>{this.displayRank(rankMeldPair[0])}s:</b> {meldCount.naturalCount}</div>
-                        <div><b>W:</b> {meldCount.wildCount}</div>
-                    </div>
+            <div className="d-flex align-items-center pr-3">
+                {this.renderMeldCard(card, meldCount)}
+                <div className="d-flex flex-column pl-2">
+                    <div><b>{this.displayRank(rank)}s:</b> {meldCount.naturalCount}</div>
+                    <div><b>W:</b> {meldCount.wildCount}</div>
                 </div>
-            </Col>
+            </div>
         );
     }
 
@@ -76,9 +81,9 @@ export class Melds extends React.Component<MeldProps, {}> {
         }
 
         const melds = [];
-        const sortedMelds = [...this.props.melds.entries()].sort((a: RankMeldPair, b: RankMeldPair) => {
-            const aRank = rankToOrdinal[a[0]];
-            const bRank = rankToOrdinal[b[0]];
+        const sortedMelds = Object.entries(this.props.melds).sort((a: MeldEntry, b: MeldEntry) => {
+            const aRank = rankToOrdinal[a[0] as Rank];
+            const bRank = rankToOrdinal[b[0] as Rank];
 
             if (aRank < bRank) {
                 return -1;
@@ -88,14 +93,7 @@ export class Melds extends React.Component<MeldProps, {}> {
             return 0;
         });
         
-        for (let row = 0; row < (sortedMelds.length / meldsPerRow) + 1; row++) {
-            const rowMelds = sortedMelds.slice(row * meldsPerRow, (row + 1) * meldsPerRow);
-            melds.push(
-                <Row>
-                    {rowMelds.map((rankMeldPair: RankMeldPair) => this.renderSingleMeld(rankMeldPair))}
-                </Row>
-            );
-        }
-        return melds;
+        melds.push(sortedMelds.map((rankMeldPair: MeldEntry) => this.renderSingleMeld(rankMeldPair[0] as Rank, rankMeldPair[1]!)));
+        return <div className="d-flex flex-wrap align-items-end">{melds}</div>;
     }
 }

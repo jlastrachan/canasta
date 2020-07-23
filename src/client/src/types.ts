@@ -24,6 +24,7 @@ export interface GamePlayer {
     user_id: string,
 }
 
+export type MeldMap = {[ key in Rank ]?: Array<Card>};
 
 export interface GameState {
     turn: string,
@@ -31,8 +32,8 @@ export interface GameState {
     hand: Array<Card>,
     hand_status: HandState,
     players: Array<GamePlayer>,
-    melds: Map<string, Map<Rank, Array<Card>>>,
-    top_of_discard: Card,
+    melds: {[key: string]: MeldMap},
+    top_of_discard?: Card,
     discard_length: number,
     scores: {[key: string]: number}, // keyed by user_id
 }

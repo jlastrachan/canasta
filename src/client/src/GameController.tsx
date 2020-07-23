@@ -1,5 +1,5 @@
 import React from 'react';
-import { Card, GameState, HandState, MatchState, GameActions } from './types';
+import { Card, GameState, HandState, MatchState, MeldMap, Rank, GameActions } from './types';
 import {
   addUser,
   clearGame,
@@ -8,6 +8,7 @@ import {
   getGameState,
   listUsers,
   meld,
+  MeldError,
   pickCard,
   pickDiscard,
   startGame,
@@ -15,6 +16,7 @@ import {
 import { NavBar } from './components/navbar';
 import { StartGame } from './components/StartGame';
 import { GameView } from './components/GameView';
+import { AfterHand } from './components/AfterHand';
 
 interface GameControllerState {
     name: string,
@@ -22,7 +24,7 @@ interface GameControllerState {
     gameState?: GameState,
     selectedCards: Array<string>,
     selectingMeldRank: boolean,
-    pendingMeld?: Map<string, Array<Card>>,
+    pendingMeld?: MeldMap,
     registeredUsers: Array<string>,
 }
 
@@ -116,8 +118,8 @@ export default class GameController extends React.Component<{}, GameControllerSt
     continueHand().then(this.getGameState);
   }
 
-  onMeldClick = (overrideRank: string) => {
-    var meldRank = "";
+  onMeldClick = (overrideRank?: Rank) => {
+    let meldRank: Rank | undefined = undefined;
     if (this.state.selectedCards.length === 0) {
       alert("Must select cards");
       return;
@@ -154,30 +156,46 @@ export default class GameController extends React.Component<{}, GameControllerSt
     }
 
     var melds = this.getPendingMelds();
-    melds.set(meldRank, this.state.selectedCards);
+    melds[meldRank] = this.state.selectedCards;
 
-    meld(this.state.userID, melds)
-    .then(data => this.setState({ gameState: data, selectedCards: [], pendingMeld: undefined }))
-    .catch(meldError => {
+    const onError = (meldError: MeldError) => {
       if (meldError.code === "not_enough_to_open") {
-        var pendingMeld = this.state.pendingMeld ? this.state.pendingMeld : new Map<string, Array<Card>>();
-        pendingMeld.set(meldRank, this.getCardsFromHand(this.state.selectedCards));
+        let pendingMeld: MeldMap = this.state.pendingMeld ? this.state.pendingMeld : {};
+        pendingMeld[meldRank!] = this.getCardsFromHand(this.state.selectedCards);
         this.setState({ pendingMeld, selectedCards: [] });
       } else {
         alert(meldError.message);
       }
-    });
+    }
+    meld(this.state.userID, melds, onError)
+      .then(data => {
+        if (!data) {
+          return;
+        }
+
+        this.setState({ gameState: data, selectedCards: [], pendingMeld: undefined })
+      });
   }
 
-  getPendingMelds() {
-    var melds = new Map<string, Array<string>>();
+  makeOnClickMeld = (rank: Rank) => {
+    if (rank === '3') {
+      return undefined;
+    }
+
+    return () => {
+      this.onMeldClick(rank);
+    }
+  }
+
+  getPendingMelds(): { [key in Rank]?: string[] } {
+    var melds: { [key in Rank]?: string[] } = {};
 
     if (!this.state.pendingMeld) {
       return melds;
     }
 
     for (var rank in this.state.pendingMeld) {
-      melds.set(rank, this.state.pendingMeld.get(rank)!.map((c: Card) => c.id));
+      melds[rank as Rank] = this.state.pendingMeld[rank as Rank]!.map((c: Card) => c.id);
     }
     return melds;
   }
@@ -222,6 +240,10 @@ export default class GameController extends React.Component<{}, GameControllerSt
     }
   } 
 
+  onCancelPendingMeld = () => {
+    this.setState({ pendingMeld: undefined });
+  }
+
   getAllowedActions(): Array<GameActions> {
     let allowedActions = [];
     if (this.state.gameState?.turn === this.state.userID) {
@@ -241,7 +263,6 @@ export default class GameController extends React.Component<{}, GameControllerSt
   }
 
   renderBody() {
-    // TODO
     if (!this.state.gameState) {
       return <StartGame 
         onAddUserClick={this.onJoinGameClick}
@@ -254,15 +275,24 @@ export default class GameController extends React.Component<{}, GameControllerSt
         userID={this.state.userID}
         allowedActions={this.getAllowedActions()}
         onDiscardClick={this.onDiscardClick}
-        onMeldClick={() => this.onMeldClick('')}
+        onMeldClick={() => this.onMeldClick()}
         onPickCardClick={this.onPickCardClick}
         onPickDiscardClick={this.onPickDiscardClick}
         gameState={this.state.gameState}
         selectedCards={this.state.selectedCards}
         onClickCardFactory={this.makeOnClickCard}
+        onClickMeldFactory={this.state.selectingMeldRank ? this.makeOnClickMeld : undefined}
+        pendingMelds={this.state.pendingMeld}
+        onCancelPendingMelds={this.onCancelPendingMeld}
       />;
     } else {
-      return;
+      return <AfterHand
+        matchState={this.state.gameState.match_status}
+        scores={this.state.gameState.scores}
+        userID={this.state.userID}
+        otherPlayers={this.state.gameState.players}
+        onContinueHandClick={this.onContinueHandClick}
+      />
     }
   }
 
