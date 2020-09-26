@@ -77,8 +77,9 @@ export default class GameController extends React.Component<{}, GameControllerSt
   getGameState = () => {
     getGameState(this.state.userID)
     .then(data => {
-      console.log(data);
-      this.setState({ gameState: data })
+      if (data) {
+        this.setState({ gameState: data })
+      }
     });
   }
 
